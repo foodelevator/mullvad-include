@@ -8,23 +8,31 @@ ns=mv-incl
 up() {
     conf="mullvad_wireguard_linux_se_sto/se-sto-wg-001.conf"
 
-    addresses="$(awk -F" = " '/^Address/{gsub(",","\n",$2);print($2)}' < "$conf")"
-    peer_publickey="$(awk -F" = " '/^PublicKey/{print($2)}' < "$conf")"
-    peer_endpoint="$(awk -F" = " '/^Endpoint/{print($2)}' < "$conf")"
-    peer_endpoint_ip=${peer_endpoint%%:*}
-    peer_allowed_ips="$(awk -F" = " '/^AllowedIPs/{print($2)}' < "$conf")"
-    dns="$(awk -F" = " '/^DNS/{print($2)}' < "$conf")"
+    privatekey="$(jq -re '.logged_in.device.wg_data.private_key' \
+        < /etc/mullvad-vpn/device.json)"
+    account="$(jq -re '.logged_in.account_number' \
+        < /etc/mullvad-vpn/device.json)"
+
+    IFS=, read -ra addresses <<< "$(curl -sSL https://api.mullvad.net/wg -d account="$account" --data-urlencode pubkey="$(wg pubkey <<< "$privatekey")")"
+
+    IFS=, read -r relay_endpoint_ip relay_publickey <<< \
+        "$(curl -s 'https://api.mullvad.net/public/relays/wireguard/v1' | \
+            jq -re '.countries[] | select(.code == "se") |
+                    .cities[] | select(.code == "sto") |
+                    .relays[] | "\(.ipv4_addr_in),\(.public_key)"' | \
+            shuf -n1)"
 
     mkdir -p "/etc/netns/$ns"
-    echo "nameserver $dns" > "/etc/netns/$ns/resolv.conf"
+    echo "nameserver 10.64.0.1" > "/etc/netns/$ns/resolv.conf"
 
     ip link add dev "$dev" type wireguard
 
     wg set "$dev" \
-        private-key ./privatekey \
-        peer "$peer_publickey" \
-        endpoint "$peer_endpoint" \
-        allowed-ips "$peer_allowed_ips"
+        private-key /dev/stdin \
+        peer "$relay_publickey" \
+        endpoint "$relay_endpoint_ip:51820" \
+        allowed-ips "0.0.0.0/0,::0/0" \
+        <<< "$privatekey"
 
     ip netns add "$ns"
     ip link set "$dev" netns "$ns"
@@ -34,7 +42,6 @@ up() {
     done
 
     ip -n "$ns" link set up dev "$dev"
-
     ip -n "$ns" route add default dev "$dev" metric 50
 }
 
