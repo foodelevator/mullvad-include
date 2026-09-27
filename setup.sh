@@ -13,31 +13,38 @@ up() {
     peer_endpoint="$(awk -F" = " '/^Endpoint/{print($2)}' < "$conf")"
     peer_endpoint_ip=${peer_endpoint%%:*}
     peer_allowed_ips="$(awk -F" = " '/^AllowedIPs/{print($2)}' < "$conf")"
+    dns="$(awk -F" = " '/^DNS/{print($2)}' < "$conf")"
 
-    sudo ip link add dev "$dev" type wireguard
+    mkdir -p "/etc/netns/$ns"
+    echo "nameserver $dns" > "/etc/netns/$ns/resolv.conf"
 
-    sudo wg set "$dev" \
+    ip link add dev "$dev" type wireguard
+
+    wg set "$dev" \
         private-key ./privatekey \
         peer "$peer_publickey" \
         endpoint "$peer_endpoint" \
         allowed-ips "$peer_allowed_ips"
 
-    sudo ip netns add "$ns"
-    sudo ip link set "$dev" netns "$ns"
+    ip netns add "$ns"
+    ip link set "$dev" netns "$ns"
 
     for addr in $addresses; do
-        sudo ip -n "$ns" addr add dev "$dev" "$addr"
+        ip -n "$ns" addr add dev "$dev" "$addr"
     done
 
-    sudo ip -n "$ns" link set up dev "$dev"
+    ip -n "$ns" link set up dev "$dev"
 
-    sudo ip -n "$ns" route add default dev "$dev" metric 50
+    ip -n "$ns" route add default dev "$dev" metric 50
 }
 
 down() {
-    sudo ip netns delete "$ns" || true
-    sudo ip link del dev "$dev" || true
+    ip netns delete "$ns" || true
+    ip link del dev "$dev" || true
+    rm -fd "/etc/netns/$ns/resolv.conf" "/etc/netns/$ns"
 }
+
+[[ "$UID" != 0 ]] && exec sudo -E "$(readlink -f "$0")" "$@"
 
 case "$1" in
     up) up;;
