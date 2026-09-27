@@ -1,6 +1,6 @@
 #!/bin/sh
 
-set -xeuo pipefail
+set -euo pipefail
 
 dev=wg-mv-incl
 ns=mv-incl
@@ -46,8 +46,8 @@ up() {
 }
 
 down() {
+    ip -n "$ns" link del dev "$dev" || true
     ip netns delete "$ns" || true
-    ip link del dev "$dev" || true
     rm -fd "/etc/netns/$ns/resolv.conf" "/etc/netns/$ns"
 }
 
