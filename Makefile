@@ -1,8 +1,8 @@
 PREFIX = ~/.local
 
-mv-incl: mv-incl.zig
+mv-incl: mv-incl.c
 	rm -f "$@"
-	zig 0.16.0 build-exe "$<"
+	gcc -std=c99 -Os -o mv-incl mv-incl.c -Wall -Werror -Wextra -pedantic
 	sudo chown root:root "$@"
 	sudo chmod +s "$@"
 
