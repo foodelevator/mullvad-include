@@ -1,13 +1,15 @@
 PREFIX = ~/.local
+SUDO = sudo
+CFLAGS = -std=c99 -Os -Wall -Werror -Wextra -pedantic
 
 mv-incl: mv-incl.c
 	rm -f "$@"
-	gcc -std=c99 -Os -o mv-incl mv-incl.c -Wall -Werror -Wextra -pedantic
-	sudo chown root:root "$@"
-	sudo chmod +s "$@"
+	$(CC) $(CFLAGS) -o mv-incl mv-incl.c
+	$(SUDO) chown root:root "$@"
+	$(SUDO) chmod 4755 "$@"
 
 install: mv-incl mv-incl-setup
 	cp mv-incl-setup $(PREFIX)/bin
-	mv mv-incl $(PREFIX)/bin
+	mv -f mv-incl $(PREFIX)/bin
 
 .PHONY: install

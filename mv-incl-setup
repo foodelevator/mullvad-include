@@ -6,8 +6,6 @@ dev=wg-mv-incl
 ns=mv-incl
 
 up() {
-    conf="mullvad_wireguard_linux_se_sto/se-sto-wg-001.conf"
-
     privatekey="$(jq -re '.logged_in.device.wg_data.private_key' \
         < /etc/mullvad-vpn/device.json)"
     account="$(jq -re '.logged_in.account_number' \
@@ -46,14 +44,15 @@ up() {
 }
 
 down() {
-    ip -n "$ns" link del dev "$dev" || true
-    ip netns delete "$ns" || true
+    ip link del dev "$dev" 2>/dev/null || true
+    ip -n "$ns" link del dev "$dev" 2>/dev/null || true
+    ip netns delete "$ns" 2>/dev/null || true
     rm -fd "/etc/netns/$ns/resolv.conf" "/etc/netns/$ns"
 }
 
 [[ "$UID" != 0 ]] && exec sudo -E "$(readlink -f "$0")" "$@"
 
-case "$1" in
+case "${1:-up}" in
     up) up;;
     down) down;;
 esac
