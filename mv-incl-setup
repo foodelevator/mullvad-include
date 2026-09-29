@@ -11,33 +11,39 @@ up() {
     account="$(jq -re '.logged_in.account_number' \
         < /etc/mullvad-vpn/device.json)"
 
-    IFS=, read -ra addresses <<< "$(curl -sSL https://api.mullvad.net/wg -d account="$account" --data-urlencode pubkey="$(wg pubkey <<< "$privatekey")")"
+    addresses="$(curl -sSL https://api.mullvad.net/wg \
+        -d account="$account" \
+        --data-urlencode pubkey="$(printf '%s\n' "$privatekey" | wg pubkey)")"
 
-    IFS=, read -r relay_endpoint_ip relay_publickey <<< \
-        "$(curl -s 'https://api.mullvad.net/public/relays/wireguard/v1' | \
-            jq -re '.countries[] | select(.code == "se") |
-                    .cities[] | select(.code == "sto") |
-                    .relays[] | "\(.ipv4_addr_in),\(.public_key)"' | \
-            shuf -n1)"
+    IFS=, read -r relay_endpoint_ip relay_publickey <<EOF
+$(curl -s 'https://api.mullvad.net/public/relays/wireguard/v1' | \
+    jq -re '.countries[] | select(.code == "se") |
+            .cities[] | select(.code == "sto") |
+            .relays[] | "\(.ipv4_addr_in),\(.public_key)"' | \
+    shuf -n1)
+EOF
 
     mkdir -p "/etc/netns/$ns"
     echo "nameserver 10.64.0.1" > "/etc/netns/$ns/resolv.conf"
 
     ip link add dev "$dev" type wireguard
 
-    wg set "$dev" \
+    printf '%s' "$privatekey" | wg set "$dev" \
         private-key /dev/stdin \
         peer "$relay_publickey" \
         endpoint "$relay_endpoint_ip:51820" \
-        allowed-ips "0.0.0.0/0,::0/0" \
-        <<< "$privatekey"
+        allowed-ips "0.0.0.0/0,::0/0"
 
     ip netns add "$ns"
     ip link set "$dev" netns "$ns"
 
-    for addr in $addresses; do
-        ip -n "$ns" addr add dev "$dev" "$addr"
-    done
+    (
+        IFS=,
+        set -f
+        for addr in $addresses; do
+            ip -n "$ns" addr add dev "$dev" "$addr"
+        done
+    )
 
     ip -n "$ns" link set up dev "$dev"
     ip -n "$ns" route add default dev "$dev" metric 50
@@ -50,7 +56,7 @@ down() {
     rm -fd "/etc/netns/$ns/resolv.conf" "/etc/netns/$ns"
 }
 
-[[ "$UID" != 0 ]] && exec sudo -E "$(readlink -f "$0")" "$@"
+[ "$(id -u)" != 0 ] && exec sudo -E "$(readlink -f "$0")" "$@"
 
 case "${1:-up}" in
     up) up;;
