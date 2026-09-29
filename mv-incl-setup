@@ -11,9 +11,10 @@ up() {
     account="$(jq -re '.logged_in.account_number' \
         < /etc/mullvad-vpn/device.json)"
 
-    addresses="$(curl -sSL https://api.mullvad.net/wg \
-        -d account="$account" \
-        --data-urlencode pubkey="$(printf '%s\n' "$privatekey" | wg pubkey)")"
+    addresses="$(printf '%s' "$account" | \
+        curl -sSL https://api.mullvad.net/wg \
+            --data-urlencode account@- \
+            --data-urlencode pubkey="$(printf '%s\n' "$privatekey" | wg pubkey)")"
 
     IFS=, read -r relay_endpoint_ip relay_publickey <<EOF
 $(curl -s 'https://api.mullvad.net/public/relays/wireguard/v1' | \
