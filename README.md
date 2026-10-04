@@ -69,12 +69,15 @@ that any user on the system can execute programs in the network namespace used b
 Running `mv-incl` thus only makes outbound traffic and DNS requests go through Mullvad. This project
 does not consider that specifically to be an escalation of privileges.
 
-Running a program with `mv-incl` does not give it "accidental" access to the internet directly even
-if mullvad-include hasn't successfully been set up (in which case `mv-incl` usually fails) or the
-VPN relay cannot be reached. Note however that since no sandboxing is done, programs may still
-communicate with other programs. One common instance of this is that executing a web browser when it
-already is running usually just tells the running instance to open a new window. If the existing
-browser was started without `mv-incl`, it will then connect to the internet without going through
-Mullvad.
+Preventing programs ran by `mv-incl` from reaching the internet directly, without going through the
+VPN, is best-effort and by no means guaranteed. Also note that `mv-incl` is **not** a sandbox by any
+means. This means that programs can communicate with other programs. One common instance of this is
+that executing a web browser when it already is running usually just tells the running instance to
+open a new window. If the existing browser was started without `mv-incl`, it will then connect to
+the internet without going through Mullvad.
 
-DNS isolation is quite brittle. It works in chromium based browsers on my computer.
+While an attempt to make DNS requests go through Mullvad's DNS server is made, it is done in
+quite a brittle way and probably does not work at all on some setups.
+
+All that said, running `mv-incl chromium https://mullvad.net/en/check` (with no existing chromium
+instance running) reports no leaks on my computer.
